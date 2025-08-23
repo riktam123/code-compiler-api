@@ -4,12 +4,6 @@ const { v4: uuidv4 } = require("uuid");
 const fs = require("fs");
 const path = require("path");
 
-const BASE_IMAGE = "code-runner-backend";
-const MEMORY_LIMIT = 256 * 1024 * 1024;
-const CPU_SHARES = 512;
-const TIME_LIMIT_MS = 8000;
-const MAX_OUTPUT_LENGTH = 512 * 1024;
-
 const runInContainer = async ({ code, language, input }) => {
 	try {
 		const tempDir = path.join(__dirname, "run", uuidv4());
@@ -35,15 +29,27 @@ const runInContainer = async ({ code, language, input }) => {
 		fs.writeFileSync(path.join(tempDir, fileName), code);
 		fs.writeFileSync(path.join(tempDir, "input.txt"), input || "");
 
+		const limits = {
+			default: { memory: 256 * 1024 * 1024, cpu: 500000000, time: 5000, output: 128 * 1024 }, // 256MB, 0.5 CPU, 5s, 128KB
+			java: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 }, // 512MB, 1 CPU, 8s
+			csharp: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
+			kotlin: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
+			rust: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
+		};
+
+		const langKey = language.toLowerCase();
+		const { memory, cpu, time, output } = limits[langKey] || limits.default;
+
+		const baseImage = process.env.BASE_IMAGE;
+
 		const container = await docker.createContainer({
-			Image: BASE_IMAGE,
+			Image: baseImage,
 			Cmd: ["/run-code.sh", `/code/${fileName}`, `/code/input.txt`],
 			HostConfig: {
 				Binds: [`${tempDir}:/code:rw`],
-				Memory: MEMORY_LIMIT,
-				CpuShares: CPU_SHARES,
+				Memory: memory,
+				NanoCPUs: cpu,
 				NetworkMode: "none",
-				Ulimits: [{ Name: "nofile", Soft: 1024, Hard: 2048 }],
 			},
 		});
 
@@ -61,17 +67,17 @@ const runInContainer = async ({ code, language, input }) => {
 		});
 		logStream.on("data", (chunk) => {
 			const streamType = chunk[0];
-			const payload = chunk.slice(8).toString("utf8");
+			const payload = chunk.toString("utf8");
 
-			if (streamType === 1 && stdout.length < MAX_OUTPUT_LENGTH) {
+			if (streamType === 1 && stdout.length < output) {
 				stdout += payload;
-				if (stdout.length >= MAX_OUTPUT_LENGTH) {
+				if (stdout.length >= output) {
 					stdout += "\n...stdout truncated...\n";
 					codeStatus = "Max Output Limit Exceeded";
 				}
-			} else if (streamType === 2 && stderr.length < MAX_OUTPUT_LENGTH) {
+			} else if (streamType === 2 && stderr.length < output) {
 				stderr += payload;
-				if (stderr.length >= MAX_OUTPUT_LENGTH) {
+				if (stderr.length >= output) {
 					stderr += "\n...stderr truncated...\n";
 					codeStatus = "Max Error Limit Exceeded";
 				}
@@ -84,12 +90,12 @@ const runInContainer = async ({ code, language, input }) => {
 			try {
 				await container.kill();
 			} catch {}
-		}, TIME_LIMIT_MS);
+		}, time);
 
 		const waitResult = await container.wait();
 		clearTimeout(timer);
 
-		if (waitResult.StatusCode === 137) {
+		if (waitResult.StatusCode === 137 && codeStatus === "success") {
 			codeStatus = "Memory Limit Exceeded";
 		}
 
