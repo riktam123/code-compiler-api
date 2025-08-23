@@ -13,7 +13,9 @@ RUN apt-get update && apt-get install -y \
     wget \
     ca-certificates \
     apt-transport-https \
-    kotlin \
+    mono-complete \
+    unzip \
+    zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Rust
@@ -29,6 +31,12 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /usr/local/bin/dotnet-ins
  && ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet \
  && dotnet --info
 
+# Kotlin (install compiler manually)
+RUN curl -L -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v1.9.24/kotlin-compiler-1.9.24.zip \
+    && unzip kotlin.zip -d /opt \
+    && rm kotlin.zip
+ENV PATH="/opt/kotlinc/bin:$PATH"
+
 # App setup
 WORKDIR /app
 
@@ -41,6 +49,10 @@ RUN npm install --include=dev \
 
 # Copy source code
 COPY . .
+
+# Copy run-code.sh into container
+COPY run-code.sh /run-code.sh
+RUN chmod +x /run-code.sh
 
 # Add a default tsconfig.json (so Node types are recognized)
 RUN npx tsc --init --rootDir ./ --outDir ./dist --esModuleInterop --resolveJsonModule --lib es2020,dom \
