@@ -44,17 +44,13 @@ case "$EXT" in
     # Run Kotlin JAR
     java -jar /code/Program.jar < "$INPUT_FILE"
     ;;
-  cs)
+
+cs)
+    # Create temporary directory for the project
     TMP_DIR=$(mktemp -d)
-    WRAPPED_FILE="$TMP_DIR/Program.cs"
+    cp "$SOURCE_FILE" "$TMP_DIR/Program.cs"
 
-    # Wrap user code into a Program class with Main()
-    echo "using System;" > "$WRAPPED_FILE"
-    echo "class Program { static void Main() {" >> "$WRAPPED_FILE"
-    cat "$SOURCE_FILE" >> "$WRAPPED_FILE"
-    echo "} }" >> "$WRAPPED_FILE"
-
-    # Create minimal project
+    # Create minimal .NET project
     cat <<EOF > "$TMP_DIR/run.csproj"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -65,18 +61,30 @@ case "$EXT" in
 EOF
 
     cd "$TMP_DIR"
-    dotnet build -o ./out -nologo --verbosity quiet
+
+    # Disable telemetry & suppress dotnet logo
+    export DOTNET_CLI_TELEMETRY_OPTOUT=1
+    export DOTNET_NOLOGO=1
+    export DOTNET_CLI_UI_LANGUAGE=en
+
+    # Build quietly and redirect all output to /dev/null
+    dotnet build -o ./out --nologo --verbosity quiet > /dev/null 2>&1
     BUILD_STATUS=$?
 
     if [ $BUILD_STATUS -ne 0 ]; then
-        echo "C# compilation failed with exit code $BUILD_STATUS"
+        echo "C# compilation failed"
         exit $BUILD_STATUS
     fi
 
-    # Run from output folder
-    cd out
-    dotnet Program.dll < "$INPUT_FILE"
+    # Run the DLL directly
+    cd ./out
+    DLL_FILE=$(ls *.dll | head -n 1)
+
+    # Run program and print only stdout
+    dotnet "$DLL_FILE" < "$INPUT_FILE"
     ;;
+
+
 
   ts)
     # Use npx to ensure tsc works inside container
