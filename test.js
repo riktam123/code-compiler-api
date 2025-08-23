@@ -128,7 +128,7 @@ const runInContainer = async ({ code, language, input }) => {
 		await container.remove({ force: true });
 		fs.rmSync(tempDir, { recursive: true, force: true });
 
-		console.log("✅ Job completed:", output.substring(0, 100));
+		console.log("✅ Job completed:", output);
 		return output;
 	} catch (err) {
 		console.log("error to create container", err);
