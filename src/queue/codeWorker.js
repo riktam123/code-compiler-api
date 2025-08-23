@@ -1,5 +1,5 @@
-const { redis } = require('../config/redis');
-const { runInContainer } = require('../container/runInContainer');
+const { redis } = require("../config/redis");
+const { runInContainer } = require("../container/runInContainer");
 const MAX_CONCURRENT_CONTAINERS = 10;
 let runningContainers = 0;
 
@@ -18,8 +18,10 @@ const dequeueAndRun = async () => {
 	runningContainers++;
 
 	try {
-		const output = await runInContainer(job);
-		await redis.set(`result:${job.jobId}`, JSON.stringify({ status: "done", output }), "EX", 300);
+		const data = await runInContainer(job);
+		console.log("After running container, the output is :", data);
+		const jsonObj = JSON.stringify({ status: "completed", ...data });
+		await redis.set(`result:${job.jobId}`, jsonObj, "EX", 300);
 	} catch (err) {
 		console.log("error to create container", err);
 		await redis.set(

@@ -4,13 +4,11 @@ const { v4: uuidv4 } = require("uuid");
 const fs = require("fs");
 const path = require("path");
 
-
 const BASE_IMAGE = "code-runner-backend";
-const MEMORY_LIMIT = 512 * 1024 * 1024;
+const MEMORY_LIMIT = 256 * 1024 * 1024;
 const CPU_SHARES = 512;
-const TIME_LIMIT_MS = 15000;
+const TIME_LIMIT_MS = 8000;
 const MAX_OUTPUT_LENGTH = 512 * 1024;
-
 
 const runInContainer = async ({ code, language, input }) => {
 	try {
@@ -31,11 +29,9 @@ const runInContainer = async ({ code, language, input }) => {
 			csharp: "cs",
 			typescript: "ts",
 		};
-
 		const ext = extensionMap[language.toLowerCase()] || "txt";
 		const fileName = language.toLowerCase() === "csharp" ? "Program.cs" : `Program.${ext}`;
 
-		// Write code and input files
 		fs.writeFileSync(path.join(tempDir, fileName), code);
 		fs.writeFileSync(path.join(tempDir, "input.txt"), input || "");
 
@@ -53,36 +49,56 @@ const runInContainer = async ({ code, language, input }) => {
 
 		await container.start();
 
-		let output = "";
-		const logStream = await container.logs({ stdout: true, stderr: true, follow: true });
+		let stdout = "";
+		let stderr = "";
+		let codeStatus = "success";
+
+		const logStream = await container.logs({
+			stdout: true,
+			stderr: true,
+			follow: true,
+			timestamps: false,
+		});
 		logStream.on("data", (chunk) => {
-			if (output.length < MAX_OUTPUT_LENGTH) {
-				output += chunk.toString();
-				if (output.length >= MAX_OUTPUT_LENGTH) output += "\n...output truncated...\n";
+			const streamType = chunk[0];
+			const payload = chunk.slice(8).toString("utf8");
+
+			if (streamType === 1 && stdout.length < MAX_OUTPUT_LENGTH) {
+				stdout += payload;
+				if (stdout.length >= MAX_OUTPUT_LENGTH) {
+					stdout += "\n...stdout truncated...\n";
+					codeStatus = "Max Output Limit Exceeded";
+				}
+			} else if (streamType === 2 && stderr.length < MAX_OUTPUT_LENGTH) {
+				stderr += payload;
+				if (stderr.length >= MAX_OUTPUT_LENGTH) {
+					stderr += "\n...stderr truncated...\n";
+					codeStatus = "Max Error Limit Exceeded";
+				}
 			}
 		});
 
 		const timer = setTimeout(async () => {
-			console.log("⏰ Time limit exceeded. Killing container.");
+			console.log("Time limit exceeded. Killing container.");
+			codeStatus = "Time Limit Exceeded";
 			try {
 				await container.kill();
 			} catch {}
 		}, TIME_LIMIT_MS);
 
-		await new Promise((resolve) => {
-			logStream.on("end", resolve);
-			container.wait().then(resolve);
-		});
-
+		const waitResult = await container.wait();
 		clearTimeout(timer);
+
+		if (waitResult.StatusCode === 137) {
+			codeStatus = "Memory Limit Exceeded";
+		}
 
 		await container.remove({ force: true });
 		fs.rmSync(tempDir, { recursive: true, force: true });
 
-		console.log("✅ Job completed:", output);
-		return output;
+		return { output: stdout, error: stderr, codeStatus };
 	} catch (err) {
-		console.log("error to create container", err);
+		console.log("error runInContainer function", err);
 		throw err;
 	}
 };

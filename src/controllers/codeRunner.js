@@ -19,7 +19,7 @@ const runCode = async (req, res) => {
 
 const getOutputFromJobId = async (req, res) => {
 	try {
-		const { jobId } = req.params;
+		const { jobId } = req.query;
 		const result = await redis.get(`result:${jobId}`);
 		if (!result) return res.status(200).json({ status: "pending" });
 		res.status(200).json(JSON.parse(result));
