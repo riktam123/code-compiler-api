@@ -1,7 +1,7 @@
 const { redis } = require("../config/redis");
 const { runInContainer } = require("../container/runningContainer");
 
-let MAX_CONCURRENT_CONTAINERS = 8;
+let MAX_CONCURRENT_CONTAINERS = 2;
 let runningContainers = 0;
 
 const enqueue = async (job) => {

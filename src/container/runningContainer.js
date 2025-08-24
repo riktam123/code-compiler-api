@@ -30,11 +30,12 @@ const runInContainer = async ({ code, language, input }) => {
 		fs.writeFileSync(path.join(tempDir, "input.txt"), input || "");
 
 		const limits = {
-			default: { memory: 256 * 1024 * 1024, cpu: 500000000, time: 5000, output: 128 * 1024 }, // 256MB, 0.5 CPU, 5s, 128KB
+			default: { memory: 256 * 1024 * 1024, cpu: 500000000, time: 8000, output: 128 * 1024 }, // 256MB, 0.5 CPU, 5s, 128KB
 			java: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 }, // 512MB, 1 CPU, 8s
 			csharp: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
 			kotlin: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
 			rust: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
+			typescript: { memory: 256 * 1024 * 1024, cpu: 500000000, time: 15000, output: 128 * 1024 },
 		};
 
 		const langKey = language.toLowerCase();
