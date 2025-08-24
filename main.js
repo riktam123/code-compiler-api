@@ -3,7 +3,6 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const helmet = require("helmet");
 const { errorHandler } = require("./src/middleware/errorHandler");
-const { assignMaxConcurrentContainers } = require("./src/queue/codeWorker");
 require("dotenv").config();
 const app = express();
 app.use(cors());
