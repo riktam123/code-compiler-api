@@ -67,12 +67,13 @@ EOF
     export DOTNET_NOLOGO=1
     export DOTNET_CLI_UI_LANGUAGE=en
 
-    # Build quietly and redirect all output to /dev/null
-    dotnet build -o ./out --nologo --verbosity quiet > /dev/null 2>&1
+    # Build and capture output
+    BUILD_OUTPUT=$(dotnet build -o ./out --nologo --verbosity minimal 2>&1)
     BUILD_STATUS=$?
 
     if [ $BUILD_STATUS -ne 0 ]; then
         echo "C# compilation failed"
+        echo "$BUILD_OUTPUT"
         exit $BUILD_STATUS
     fi
 
