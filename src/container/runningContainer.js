@@ -55,34 +55,7 @@ const runInContainer = async ({ code, language, input }) => {
 
 		await container.start();
 
-		let stdout = "";
-		let stderr = "";
 		let codeStatus = "success";
-
-		const logStream = await container.logs({
-			stdout: true,
-			stderr: true,
-			follow: true,
-			timestamps: false,
-		});
-		logStream.on("data", (chunk) => {
-			const streamType = chunk[0];
-			const payload = chunk.toString("utf8");
-
-			if (streamType === 1 && stdout.length < output) {
-				stdout += payload;
-				if (stdout.length >= output) {
-					stdout += "\n...stdout truncated...\n";
-					codeStatus = "Max Output Limit Exceeded";
-				}
-			} else if (streamType === 2 && stderr.length < output) {
-				stderr += payload;
-				if (stderr.length >= output) {
-					stderr += "\n...stderr truncated...\n";
-					codeStatus = "Max Error Limit Exceeded";
-				}
-			}
-		});
 
 		const timer = setTimeout(async () => {
 			console.log("Time limit exceeded. Killing container.");
@@ -99,8 +72,36 @@ const runInContainer = async ({ code, language, input }) => {
 			codeStatus = "Memory Limit Exceeded";
 		}
 
+		const decodeDockerLogs = (buffer) => {
+			let result = "";
+			let offset = 0;
+			while (offset < buffer.length) {
+				const streamType = buffer[offset]; // 1=stdout, 2=stderr
+				const size = buffer.readUInt32BE(offset + 4);
+				const payload = buffer.slice(offset + 8, offset + 8 + size).toString("utf8");
+				result += payload;
+				offset += 8 + size;
+			}
+			return result;
+		};
+
+		const rawStdout = await container.logs({ stdout: true, stderr: false, follow: false });
+		const rawStderr = await container.logs({ stdout: false, stderr: true, follow: false });
+
 		await container.remove({ force: true });
 		fs.rmSync(tempDir, { recursive: true, force: true });
+
+		let stdout = decodeDockerLogs(rawStdout);
+		let stderr = decodeDockerLogs(rawStderr);
+
+		if (stdout.length > output) {
+			stdout = stdout.slice(0, output) + "\n...stdout truncated...\n";
+			codeStatus = "Max Output Limit Exceeded";
+		}
+		if (stderr.length > output) {
+			stderr = stderr.slice(0, output) + "\n...stderr truncated...\n";
+			codeStatus = "Max Error Limit Exceeded";
+		}
 
 		return { output: stdout, error: stderr, codeStatus };
 	} catch (err) {

@@ -1,5 +1,6 @@
 const { redis } = require("../config/redis");
 const { runInContainer } = require("../container/runningContainer");
+const os = require("os");
 
 let MAX_CONCURRENT_CONTAINERS = 2;
 let runningContainers = 0;
@@ -36,5 +37,22 @@ const dequeueAndRun = async () => {
 		dequeueAndRun();
 	}
 };
+
+(() => {
+	const totalCPUs = os.cpus().length;
+	const loadAvg = os.loadavg()[0]; 
+
+	console.log("Total CPUs:", totalCPUs);
+	console.log("1-min Load Avg:", loadAvg);
+	console.log("Approx Free CPUs:", Math.max(totalCPUs - loadAvg, 0));
+
+	const totalMemMB = os.totalmem() / 1024 / 1024;
+	const freeMemMB = os.freemem() / 1024 / 1024;
+	const usedMemMB = totalMemMB - freeMemMB;
+
+	console.log("Total Memory (MB):", totalMemMB);
+	console.log("Free Memory (MB):", freeMemMB);
+	console.log("Used Memory (MB):", usedMemMB);
+})();
 
 module.exports = { enqueue, dequeueAndRun };
