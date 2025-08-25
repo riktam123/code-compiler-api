@@ -90,7 +90,11 @@ EOF
 
   ts)
     # Use npx to ensure tsc works inside container
-    npx tsc "$SOURCE_FILE" --outDir /code && node /code/program.js < "$INPUT_FILE"
+    ts-node --transpile-only --skip-project --compiler-options '{"module":"CommonJS"}' "$SOURCE_FILE" < "$INPUT_FILE" 2> /code/ts-error.log
+    if [ -s /code/ts-error.log ]; then
+        cat /code/ts-error.log >&2
+        exit 1
+    fi
     ;;
 
   *)

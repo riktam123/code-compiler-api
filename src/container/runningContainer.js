@@ -35,7 +35,6 @@ const runInContainer = async ({ code, language, input }) => {
 			csharp: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
 			kotlin: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
 			rust: { memory: 512 * 1024 * 1024, cpu: 1000000000, time: 8000, output: 128 * 1024 },
-			typescript: { memory: 256 * 1024 * 1024, cpu: 500000000, time: 20000, output: 128 * 1024 },
 		};
 
 		const langKey = language.toLowerCase();

@@ -44,8 +44,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies + devDependencies
-RUN npm install --include=dev \
- && npm install --save-dev typescript @types/node ts-node
+RUN npm install -g typescript ts-node
 
 # Copy source code
 COPY . .
@@ -55,8 +54,5 @@ COPY run-code.sh /run-code.sh
 RUN chmod +x /run-code.sh
 
 # Add a default tsconfig.json (so Node types are recognized)
-RUN npx tsc --init --rootDir ./ --outDir ./dist --esModuleInterop --resolveJsonModule --lib es2020,dom \
- && sed -i 's|"strict": true,|"strict": true,\n    "types": ["node"],|' tsconfig.json
-
 EXPOSE 5100
 CMD ["npm", "start"]
